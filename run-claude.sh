@@ -971,15 +971,10 @@ generate_dockerfile_content() {
   fi
 
   # Generate the package installation lines
+  # All packages get backslash to continue RUN with cleanup
   local package_lines=""
   for ((i = 0; i < ${#all_packages[@]}; i++)); do
-    if [[ $i -eq $((${#all_packages[@]} - 1)) ]]; then
-      # Last package, add backslash to continue RUN with cleanup
-      package_lines+=$'\t'"${all_packages[i]}"$' \\\n'
-    else
-      # Not last package, add backslash and newline
-      package_lines+=$'\t'"${all_packages[i]}"$' \\\n'
-    fi
+    package_lines+=$'\t'"${all_packages[i]}"$' \\\n'
   done
 
   cat <<'DOCKERFILE_EOF'
