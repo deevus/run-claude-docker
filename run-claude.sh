@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Claude Code Docker Runner Script
 # Usage: ./run-claude.sh [options] [command]
