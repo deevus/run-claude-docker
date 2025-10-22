@@ -954,7 +954,7 @@ generate_dockerfile_content() {
     "zsh"
     "gh"
     "vim"
-    "neovim"
+    "software-properties-common"
     "htop"
     "jq"
     "tree"
@@ -998,6 +998,11 @@ DOCKERFILE_EOF
   echo -e "$package_lines"
 
   cat <<'DOCKERFILE_EOF'
+
+# Add Neovim unstable PPA and install neovim >= 0.11.2 (required for LazyVim)
+RUN add-apt-repository ppa:neovim-ppa/unstable -y \
+	&& apt-get update \
+	&& apt-get install -y neovim
 
 # Clean up apt cache
 RUN rm -rf /var/lib/apt/lists/*
