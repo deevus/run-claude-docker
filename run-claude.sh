@@ -220,9 +220,9 @@ _run_claude_completion() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    
+
     opts="-w --workspace -c --claude-config -n --name -i --image --rm --no-interactive --no-privileged --safe --no-gpg --gpg --build --rebuild --recreate --verbose --remove-containers --force-remove-all-containers --export-dockerfile --push-to --generate-completions --username --extra-package -E --forward-variable --aws -h --help"
-    
+
     case "${prev}" in
         -w|--workspace)
             COMPREPLY=( $(compgen -d -- ${cur}) )
@@ -267,7 +267,7 @@ _run_claude_completion() {
         *)
             ;;
     esac
-    
+
     COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
     return 0
 }
@@ -954,7 +954,7 @@ generate_dockerfile_content() {
     "zsh"
     "gh"
     "vim"
-    "software-properties-common"
+    "neovim"
     "htop"
     "jq"
     "tree"
@@ -974,8 +974,8 @@ generate_dockerfile_content() {
   local package_lines=""
   for ((i = 0; i < ${#all_packages[@]}; i++)); do
     if [[ $i -eq $((${#all_packages[@]} - 1)) ]]; then
-      # Last package, no backslash since we're ending the RUN instruction
-      package_lines+=$'\t'"${all_packages[i]}"
+      # Last package, add backslash to continue RUN with cleanup
+      package_lines+=$'\t'"${all_packages[i]}"$' \\\n'
     else
       # Not last package, add backslash and newline
       package_lines+=$'\t'"${all_packages[i]}"$' \\\n'
@@ -990,22 +990,20 @@ generate_dockerfile_content() {
 # ============================================================================
 FROM ubuntu:25.04 AS base-tools
 
-# Install system dependencies including zsh and tools
-RUN apt-get update && apt-get install -y \
+# Add Neovim unstable PPA and install all system dependencies
+RUN apt-get update \
+	&& apt-get install -y software-properties-common \
+	&& add-apt-repository ppa:neovim-ppa/unstable -y \
+	&& apt-get update \
+	&& apt-get install -y \
 DOCKERFILE_EOF
 
   # Insert the dynamic package list
   echo -e "$package_lines"
 
   cat <<'DOCKERFILE_EOF'
-
-# Add Neovim unstable PPA and install neovim >= 0.11.2 (required for LazyVim)
-RUN add-apt-repository ppa:neovim-ppa/unstable -y \
-	&& apt-get update \
-	&& apt-get install -y neovim
-
-# Clean up apt cache
-RUN rm -rf /var/lib/apt/lists/*
+ \
+	&& rm -rf /var/lib/apt/lists/*
 
 # Install Go
 RUN ARCH=$(dpkg --print-architecture) && \
@@ -1096,17 +1094,17 @@ RUN cat > /entrypoint.sh << 'EOF'
 # Merge Claude config from host file if available
 if [ -f "$HOME/.claude.host.json" ]; then
   CONFIG_KEYS="oauthAccount hasSeenTasksHint userID hasCompletedOnboarding lastOnboardingVersion subscriptionNoticeCount hasAvailableSubscription s1mAccessCache"
-  
+
   # Build jq expression for extraction
   JQ_EXPR=""
   for key in $CONFIG_KEYS; do
     if [ -n "$JQ_EXPR" ]; then JQ_EXPR="$JQ_EXPR, "; fi
     JQ_EXPR="$JQ_EXPR\"$key\": .$key"
   done
-  
+
   # Extract config data and add bypass permissions
   HOST_CONFIG=$(jq -c "{$JQ_EXPR, \"bypassPermissionsModeAccepted\": true}" "$HOME/.claude.host.json" 2>/dev/null || echo "")
-  
+
   if [ -n "$HOST_CONFIG" ] && [ "$HOST_CONFIG" != "null" ] && [ "$HOST_CONFIG" != "{}" ]; then
     if [ -f "$HOME/.claude.json" ]; then
       # Merge with existing container file
@@ -1133,12 +1131,12 @@ fi
 if [ -S "/gpg-agent-extra" ]; then
   # Detect expected socket location dynamically
   EXPECTED_SOCKET=$(gpgconf --list-dirs agent-socket 2>/dev/null)
-  
+
   if [ -n "$EXPECTED_SOCKET" ]; then
     # Create directory structure for expected socket location
     mkdir -p "$(dirname "$EXPECTED_SOCKET")"
     chmod 700 "$(dirname "$EXPECTED_SOCKET")"
-    
+
     # Link forwarded socket to expected location
     ln -sf /gpg-agent-extra "$EXPECTED_SOCKET"
     if [ "$RUN_CLAUDE_VERBOSE" = "1" ]; then
